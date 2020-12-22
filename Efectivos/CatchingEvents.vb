@@ -3,7 +3,7 @@
     Friend WithEvents SBOApplication As SAPbouiCOM.Application '//OBJETO DE APLICACION
     Friend SBOCompany As SAPbobsCOM.Company '//OBJETO COMPAÑIA
     Friend csDirectory As String '//DIRECTORIO DONDE SE ENCUENTRAN LOS .SRF
-    Dim TransId, Comments, Cuenta As String
+    Dim TransId, Comments, Cuenta, DocDate, JDTNUM As String
     Dim DocTotal As Double
 
     Public Sub New()
@@ -142,9 +142,7 @@
         'Dim otekPagos As FrmtekPagos
         Dim coForm As SAPbouiCOM.Form
         Dim stTabla As String
-        Dim oRecSetH As SAPbobsCOM.Recordset
         Dim oDatatable As SAPbouiCOM.DBDataSource
-        oRecSetH = SBOCompany.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset)
 
         Try
 
@@ -161,9 +159,10 @@
                             coForm = SBOApplication.Forms.Item(FormUID)
 
                             oDatatable = coForm.DataSources.DBDataSources.Item(stTabla)
-                            TransId = oDatatable.GetValue("Number", 0)
-                            Comments = oDatatable.GetValue("Memo", 0)
-                            DocTotal = oDatatable.GetValue("LocTotal", 0)
+                            TransId = RTrim(oDatatable.GetValue("Project", 0))
+                            Comments = RTrim(oDatatable.GetValue("Memo", 0))
+                            DocDate = oDatatable.GetValue("RefDate", 0)
+                            'JDTNUM = oDatatable.GetValue("JDT_NUM", 0)
 
                     End Select
 
@@ -187,6 +186,9 @@
         Dim oRecSetH As SAPbobsCOM.Recordset
         oRecSetH = SBOCompany.GetBusinessObject(SAPbobsCOM.BoObjectTypes.BoRecordset)
 
+        Dim vJE As SAPbobsCOM.JournalEntries
+        vJE = SBOCompany.GetBusinessObject(SAPbobsCOM.BoObjectTypes.oJournalEntries)
+
         Try
 
             Select Case pVal.EventType
@@ -198,7 +200,9 @@
                                     '--- Boton Movimientos del Pedido
                         Case 1
 
-                            stQueryH = "Select T0.""Account"" from JDT1 T0 Inner join OJDT T1 on T1.""TransId""=T0.""TransId"" where T1.""Number""=" & TransId & " and T0.""Line_ID""<>0 group by T0.""Account"""
+                            JDTNUM = vJE.JdtNum.ToString
+
+                            stQueryH = "Select T0.""Account"", T1.""LocTotal"" from JDT1 T0 Inner join OJDT T1 on T1.""TransId""=T0.""TransId"" where T1.""Memo""='" & Comments & "' and T1.""RefDate""='" & DocDate & "' and T0.""Project""='" & TransId & "' and T0.""Line_ID""<>0 group by T0.""Account"", T1.""LocTotal"""
                             oRecSetH.DoQuery(stQueryH)
 
                             If oRecSetH.RecordCount = 1 Then
@@ -208,6 +212,7 @@
 
                                 If Cuenta = "110101060" Then
 
+                                    DocTotal = oRecSetH.Fields.Item("LocTotal").Value
                                     oOBNK = New OBNK
                                     oOBNK.UpdateOBNK(Comments, DocTotal)
 
